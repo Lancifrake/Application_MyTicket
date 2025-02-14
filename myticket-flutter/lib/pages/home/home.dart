@@ -15,52 +15,39 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedCategory = 0;
   int _selectedIndex = 0;
   late Future<List<Map<String, dynamic>>> eventsFuture;
+  List<Map<String, dynamic>> allEvents = [];
+  List<Map<String, dynamic>> filteredEvents = [];
+  TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     eventsFuture = fetchEvents();
+    _searchController.addListener(_filterEvents);
   }
 
   Future<List<Map<String, dynamic>>> fetchEvents() async {
     final response = await http.get(Uri.parse('http://localhost:2000/api/events/home'));
     if (response.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      final events = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      setState(() {
+        allEvents = events;
+        filteredEvents = events;
+      });
+      return events;
     } else {
       throw Exception('Erreur lors de la récupération des événements');
     }
   }
 
-  void _onItemTapped(int index) {
-    if (_selectedIndex == index) return;
-
+  void _filterEvents() {
+    final query = _searchController.text.toLowerCase();
     setState(() {
-      _selectedIndex = index;
+      filteredEvents = allEvents.where((event) {
+        final name = event['nom'].toString().toLowerCase();
+        return name.contains(query);
+      }).toList();
     });
-
-    Widget nextPage;
-
-    switch (index) {
-      case 0:
-        nextPage = HomeScreen();
-        break;
-      case 1:
-        nextPage = EventPage();
-        break;
-      case 2:
-        nextPage = TicketsPage();
-        break;
-      case 3:
-        nextPage = ProfilePage();
-        break;
-      default:
-        return;
-    }
-
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => nextPage),
-    );
   }
 
   @override
@@ -76,6 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 children: [
                   Expanded(
                     child: TextField(
+                      controller: _searchController,
                       decoration: InputDecoration(
                         hintText: "Rechercher un concert...",
                         prefixIcon: Icon(Icons.search, color: Colors.grey),
@@ -100,24 +88,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             Container(
               height: 200,
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: eventsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Erreur : ${snapshot.error}'));
-                  } else {
-                    final events = snapshot.data!;
-                    return PageView.builder(
-                      controller: _pageController,
-                      itemCount: events.length,
-                      itemBuilder: (context, index) {
-                        final event = events[index];
-                        return _buildFeaturedConcert(event['imagePath'] ?? 'assets/images/eminem.jpg');
-                      },
-                    );
-                  }
+              child: filteredEvents.isEmpty
+                  ? Center(child: Text("Aucun événement trouvé"))
+                  : PageView.builder(
+                controller: _pageController,
+                itemCount: filteredEvents.length,
+                itemBuilder: (context, index) {
+                  final event = filteredEvents[index];
+                  return _buildFeaturedConcert(event['imagePath'] ?? 'https://via.placeholder.com/150');
                 },
               ),
             ),
@@ -135,28 +113,16 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             SizedBox(height: 15),
             Expanded(
-              child: FutureBuilder<List<Map<String, dynamic>>>(
-                future: eventsFuture,
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Center(child: CircularProgressIndicator());
-                  } else if (snapshot.hasError) {
-                    return Center(child: Text('Erreur : ${snapshot.error}'));
-                  } else {
-                    final events = snapshot.data!;
-                    return ListView.builder(
-                      itemCount: events.length,
-                      itemBuilder: (context, index) {
-                        final event = events[index];
-                        return _buildEventCard(
-                          event['nom'],
-                          event['imagePath'] ?? 'assets/images/eminem.jpg',
-                          event['lieu'],
-                          event['date'].split('T')[0],
-                        );
-                      },
-                    );
-                  }
+              child: ListView.builder(
+                itemCount: filteredEvents.length,
+                itemBuilder: (context, index) {
+                  final event = filteredEvents[index];
+                  return _buildEventCard(
+                    event['nom'],
+                    event['imagePath'] ?? 'https://via.placeholder.com/150',
+                    event['lieu'],
+                    event['date'].split('T')[0],
+                  );
                 },
               ),
             ),
@@ -186,7 +152,7 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(15),
         color: Colors.grey[300],
         image: DecorationImage(
-          image: AssetImage(imagePath),
+          image: NetworkImage(imagePath),
           fit: BoxFit.cover,
         ),
       ),
@@ -209,17 +175,14 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(10),
-              child: Image.asset(imagePath, width: 100, height: 100, fit: BoxFit.cover),
+              child: Image.network(imagePath, width: 100, height: 100, fit: BoxFit.cover),
             ),
             SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
+                  Text(title, style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                   SizedBox(height: 5),
                   Row(
                     children: [
@@ -264,5 +227,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  void _onItemTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
   }
 }

@@ -20,7 +20,6 @@ export const getEventImages = async (req, res) => {
         res.status(500).json({ message: 'Erreur serveur' });
     }
 };
-
 export const getEventsForHome = async (req, res) => {
     try {
         const query = `
@@ -36,7 +35,6 @@ export const getEventsForHome = async (req, res) => {
         res.status(500).json({ message: 'Erreur serveur' });
     }
 };
-
 export const getEventsForEvent = async (req, res) => {
     try {
         const [rows] = await db.query(`
@@ -50,3 +48,28 @@ export const getEventsForEvent = async (req, res) => {
         res.status(500).json({ message: 'Erreur serveur' });
     }
 };
+export const searchEvents = async (req, res) => {
+    const { query } = req.query;
+
+    if (!query) {
+        return res.status(400).json({ message: "Le paramètre 'query' est requis" });
+    }
+
+    try {
+        const [results] = await db.query(
+            `
+      SELECT idEvenement, nom, lieu, date, description 
+      FROM evenement 
+      WHERE nom LIKE ? OR lieu LIKE ? OR description LIKE ?
+      `,
+            [`%${query}%`, `%${query}%`, `%${query}%`]
+        );
+
+        res.status(200).json(results);
+    } catch (error) {
+        console.error("Erreur lors de la recherche :", error);
+        res.status(500).json({ message: "Erreur serveur" });
+    }
+};
+
+
