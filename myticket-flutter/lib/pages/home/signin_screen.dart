@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'signup_screen.dart';
-import 'home.dart';  // Page principale pour les utilisateurs
-import 'package:projects/pages/scanner/home_s.dart';  // Page spécifique pour les scanneurs
-import 'package:projects/pages/admin/dashboard.dart';  // Page pour les administrateurs
+import 'home.dart';
+import 'package:projects/pages/scanner/home_s.dart';
+import 'package:projects/pages/admin/dashboard.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -12,42 +12,65 @@ class SignInScreen extends StatelessWidget {
   final TextEditingController passwordController = TextEditingController();
 
   Future<void> signin(BuildContext context) async {
-    print("Email : ${emailController.text}");
-    print("Mot de passe : ${passwordController.text}");
-    final url = Uri.parse('http://localhost:2000/api/auth/login');
-    final response = await http.post(
-      url,
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "email": emailController.text,
-        "motDePasse": passwordController.text,
-      }),
+    // Afficher indicateur de chargement
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(child: CircularProgressIndicator()),
     );
-
-    print("Réponse reçue : ${response.statusCode}");
-    if (response.statusCode == 200) {
-      final data = jsonDecode(response.body);
-      final token = data['token'];
-      final role = data['role'];  // Récupère le rôle depuis la réponse
-
-      print("Connexion réussie, rôle : $role");
-
-      // Stockage du token dans SharedPreferences
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      await prefs.setString('token', token);
-
-      // Redirige selon le rôle
-      if (role == 'scanner') {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => Home_sScreen()));
-      } else if (role == 'admin') {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => OrganizerDashboard()));
+    
+    try {
+      final url = Uri.parse('http://localhost:2000/api/auth/login');
+      final response = await http.post(
+        url,
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "email": emailController.text,
+          "motDePasse": passwordController.text,
+        }),
+      );
+  
+      // Fermer le dialogue de chargement
+      Navigator.pop(context);
+  
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final token = data['token'];
+        final role = data['role'];
+        final userId = data['id'];
+  
+        // Stockage du token dans SharedPreferences
+        SharedPreferences prefs = await SharedPreferences.getInstance();
+        await prefs.setString('token', token);
+        await prefs.setInt('userId', userId);
+  
+        // Redirige selon le rôle
+        if (role == 'scanner') {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => Home_sScreen()));
+        } else if (role == 'admin') {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => OrganizerDashboard()));
+        } else {
+          Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+        }
       } else {
-        Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => HomeScreen()));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Erreur : ${jsonDecode(response.body)['message']}'),
+            backgroundColor: Colors.red,
+            duration: Duration(seconds: 3),
+          ),
+        );
       }
-    } else {
-      print("Erreur lors de la connexion : ${response.body}");
+    } catch (e) {
+      // Fermer le dialogue de chargement en cas d'erreur
+      Navigator.pop(context);
+      
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Erreur : ${jsonDecode(response.body)['message']}')),
+        SnackBar(
+          content: Text('Erreur de connexion. Vérifiez votre connexion internet.'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
       );
     }
   }
@@ -57,6 +80,7 @@ class SignInScreen extends StatelessWidget {
     return Scaffold(
       body: Stack(
         children: [
+          // Image d'arrière-plan
           Container(
             height: MediaQuery.of(context).size.height * 0.4,
             decoration: BoxDecoration(
@@ -70,6 +94,7 @@ class SignInScreen extends StatelessWidget {
             child: Column(
               children: [
                 SizedBox(height: MediaQuery.of(context).size.height * 0.15),
+                // Texte de bienvenue amélioré
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Text(
@@ -79,34 +104,52 @@ class SignInScreen extends StatelessWidget {
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
                       color: Colors.white,
+                      height: 1.3,
                       shadows: [
-                        Shadow(blurRadius: 5.0, color: Colors.black.withOpacity(0.5), offset: Offset(1, 1)),
+                        Shadow(blurRadius: 8.0, color: Colors.black.withOpacity(0.6), offset: Offset(1, 1)),
                       ],
                     ),
                   ),
                 ),
                 SizedBox(height: 100),
+                // Container blanc avec ombre
                 Container(
                   padding: EdgeInsets.symmetric(horizontal: 20, vertical: 30),
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: Offset(0, -5),
+                      ),
+                    ],
                   ),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       _buildInputField(Icons.email, "Email", emailController),
-                      SizedBox(height: 15),
+                      SizedBox(height: 20),
                       _buildInputField(Icons.lock, "Mot de passe", passwordController, isPassword: true),
-                      SizedBox(height: 10),
+                      SizedBox(height: 15),
                       Align(
                         alignment: Alignment.centerRight,
                         child: TextButton(
-                          onPressed: () {},
-                          child: Text("Mot de passe oublié ?", style: TextStyle(color: Colors.blue)),
+                          onPressed: () {
+                            // Action pour mot de passe oublié
+                          },
+                          style: TextButton.styleFrom(
+                            foregroundColor: Color(0xFF0172B2),
+                          ),
+                          child: Text(
+                            "Mot de passe oublié ?", 
+                            style: TextStyle(fontWeight: FontWeight.w600),
+                          ),
                         ),
                       ),
                       SizedBox(height: 30),
+                      // Bouton de connexion amélioré
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
@@ -114,26 +157,42 @@ class SignInScreen extends StatelessWidget {
                             signin(context);
                           },
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.blue,
+                            backgroundColor: Color(0xFF0172B2),
+                            foregroundColor: Colors.white,
                             padding: EdgeInsets.symmetric(vertical: 15),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 3,
                           ),
-                          child: Text("Se Connecter", style: TextStyle(fontSize: 18, color: Colors.white)),
+                          child: Text(
+                            "Se Connecter", 
+                            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)
+                          ),
                         ),
                       ),
-                      SizedBox(height: 10),
+                      SizedBox(height: 20),
+                      // Lien d'inscription amélioré
                       Center(
                         child: GestureDetector(
                           onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (context) => SignUpScreen()));
+                            Navigator.push(
+                              context, 
+                              MaterialPageRoute(builder: (context) => SignUpScreen())
+                            );
                           },
                           child: Text.rich(
                             TextSpan(
                               text: "ou ",
-                              style: TextStyle(color: Colors.black54),
+                              style: TextStyle(color: Colors.black54, fontSize: 16),
                               children: [
                                 TextSpan(
                                   text: "S'inscrire ici",
-                                  style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
+                                  style: TextStyle(
+                                    color: Color(0xFF0172B2), 
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 16,
+                                  ),
                                 ),
                               ],
                             ),
@@ -152,16 +211,37 @@ class SignInScreen extends StatelessWidget {
   }
 
   Widget _buildInputField(IconData icon, String hintText, TextEditingController controller, {bool isPassword = false}) {
-    return TextField(
+    return TextFormField(
       controller: controller,
       obscureText: isPassword,
       decoration: InputDecoration(
-        prefixIcon: Icon(icon, color: Colors.grey),
+        prefixIcon: Icon(icon, color: Color(0xFF0172B2)),
         hintText: hintText,
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Color(0xFF0172B2), width: 2),
+        ),
         filled: true,
-        fillColor: Colors.grey[200],
+        fillColor: Colors.grey[100],
+        contentPadding: EdgeInsets.symmetric(vertical: 15),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(10),
+          borderSide: BorderSide(color: Colors.red, width: 1),
+        ),
       ),
+      validator: (value) {
+        if (value == null || value.isEmpty) {
+          return 'Ce champ est requis';
+        }
+        if (hintText == "Email" && !value.contains('@')) {
+          return 'Email invalide';
+        }
+        if (hintText == "Mot de passe" && value.length < 6) {
+          return 'Le mot de passe doit contenir au moins 6 caractères';
+        }
+        return null;
+      },
     );
   }
 }

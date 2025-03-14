@@ -1,0 +1,2 @@
+C:/Users/lanci/Desktop/Application_MyTicket/myticket-flutter/android/app/.cxx/Debug/6i3t4q52/armeabi-v7a/CMakeFiles/edit_cache.dir
+C:/Users/lanci/Desktop/Application_MyTicket/myticket-flutter/android/app/.cxx/Debug/6i3t4q52/armeabi-v7a/CMakeFiles/rebuild_cache.dir

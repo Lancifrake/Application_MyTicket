@@ -14,20 +14,42 @@ class EventPage extends StatefulWidget {
 class _EventPageState extends State<EventPage> {
   int _selectedIndex = 1;
   late Future<List<Map<String, dynamic>>> eventsFuture;
+  List<Map<String, dynamic>> allEvents = [];
+  List<Map<String, dynamic>> filteredEvents = [];
+  TextEditingController _searchController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     eventsFuture = fetchEvents();
+    _searchController.addListener(_filterEvents);
   }
 
   Future<List<Map<String, dynamic>>> fetchEvents() async {
     final response = await http.get(Uri.parse('http://localhost:2000/api/events/forEvent'));
     if (response.statusCode == 200) {
-      return List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      final events = List<Map<String, dynamic>>.from(jsonDecode(response.body));
+      setState(() {
+        allEvents = events;
+        filteredEvents = events;
+      });
+      return events;
     } else {
       throw Exception('Erreur lors de la récupération des événements');
     }
+  }
+
+  void _filterEvents() {
+    final query = _searchController.text.toLowerCase();
+    setState(() {
+      filteredEvents = allEvents.where((event) {
+        final name = event['nom'].toString().toLowerCase();
+        final location = event['lieu'].toString().toLowerCase();
+        final date = event['date'].toString().toLowerCase();
+        return name.contains(query) || location.contains(query) || date.contains(query);
+      }).toList();
+    });
+    print('Filtered events: $filteredEvents');
   }
 
   void _onItemTapped(int index) {
@@ -71,57 +93,64 @@ class _EventPageState extends State<EventPage> {
         elevation: 0,
         actions: [
           IconButton(
-            icon: Icon(Icons.shopping_cart, color: Colors.blue),
-            onPressed: () {},
+            icon: Icon(Icons.shopping_cart, color: Color(0xFF0172B2), size: 28),
+            onPressed: () {
+              Navigator.pushReplacementNamed(context, '/cart');
+            },
           ),
         ],
       ),
-      body: FutureBuilder<List<Map<String, dynamic>>>(
-        future: eventsFuture,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return Center(child: CircularProgressIndicator());
-          } else if (snapshot.hasError) {
-            return Center(child: Text('Erreur : ${snapshot.error}'));
-          } else {
-            final events = snapshot.data!;
-            return SingleChildScrollView(
-              child: Padding(
-                padding: EdgeInsets.all(16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    TextField(
-                      decoration: InputDecoration(
-                        hintText: 'Rechercher un concert...',
-                        prefixIcon: Icon(Icons.search),
-                        filled: true,
-                        fillColor: Colors.grey[200],
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(30.0),
-                          borderSide: BorderSide.none,
-                        ),
-                      ),
-                    ),
-                    SizedBox(height: 20),
-                    ...events.map((event) => EventCard(
-                      eventId: event['idEvenement'],
-                      imageUrl: event['imagePath'] ?? 'assets/images/eminem.jpg', // Utiliser l'image réelle si elle existe
-                      title: event['nom'],
-                      location: event['lieu'],
-                      date: event['date'].split('T')[0],
-                      description: event['description'],
-                    )),
-                  ],
+      body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Rechercher un concert...',
+                prefixIcon: Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.grey[200],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(30.0),
+                  borderSide: BorderSide.none,
                 ),
               ),
-            );
-          }
-        },
+            ),
+          ),
+          Expanded(
+            child: FutureBuilder<List<Map<String, dynamic>>>(
+              future: eventsFuture,
+              builder: (context, snapshot) {
+                if (snapshot.connectionState == ConnectionState.waiting) {
+                  return Center(child: CircularProgressIndicator());
+                } else if (snapshot.hasError) {
+                  return Center(child: Text('Erreur : ${snapshot.error}'));
+                } else {
+                  return ListView.builder(
+                    itemCount: filteredEvents.length,
+                    itemBuilder: (context, index) {
+                      final event = filteredEvents[index];
+                      return EventCard(
+                        eventId: event['idEvenement'],
+                        imageUrl: event['imagePath'] ?? 'assets/images/eminem.jpg',
+                        title: event['nom'],
+                        location: event['lieu'],
+                        date: event['date'].split('T')[0],
+                        description: event['description'],
+                      );
+                    },
+                  );
+                }
+              },
+            ),
+          ),
+        ],
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue,
+        selectedItemColor: Color(0xFF0172B2),
         unselectedItemColor: Colors.grey,
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -129,7 +158,7 @@ class _EventPageState extends State<EventPage> {
           BottomNavigationBarItem(icon: Icon(Icons.home), label: 'Accueil'),
           BottomNavigationBarItem(icon: Icon(Icons.event), label: 'Event'),
           BottomNavigationBarItem(icon: Icon(Icons.confirmation_number), label: 'Tickets'),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profile'),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: 'Profil'),
         ],
       ),
     );
@@ -197,7 +226,15 @@ class EventCard extends StatelessWidget {
                       onPressed: () {
                         Navigator.push(
                           context,
-                          MaterialPageRoute(builder: (context) => BuyTicket_1Page()),
+                          MaterialPageRoute(
+                            builder: (context) => BuyTicket_1Page(
+                              eventId: eventId,
+                              eventName: title,
+                              eventDate: date,
+                              eventLocation: location,
+                              imageUrl: imageUrl,
+                            ),
+                          ),
                         );
                       },
                       child: Text('Buy Ticket now', style: TextStyle(color: Colors.green)),
@@ -206,7 +243,7 @@ class EventCard extends StatelessWidget {
                       onPressed: () {
                         _showEventDetails(context);
                       },
-                      child: Text('En savoir plus...', style: TextStyle(color: Colors.blue)),
+                      child: Text('En savoir plus...', style: TextStyle(color: Color(0xFF0172B2))),
                     ),
                   ],
                 ),
@@ -219,44 +256,122 @@ class EventCard extends StatelessWidget {
   }
 
   void _showEventDetails(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(15)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: EdgeInsets.all(16),
-          height: 300,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                title,
-                style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-              ),
-              Divider(),
-              SizedBox(height: 8),
-              Text(
-                "📍 Lieu: $location\n"
-                    "📅 Date: $date\n"
-                    "📖 Description: $description",
-                style: TextStyle(fontSize: 14),
-              ),
-              Spacer(),
-              Align(
-                alignment: Alignment.centerRight,
-                child: ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  child: Text("Fermer"),
+  showModalBottomSheet(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.white,
+    shape: RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+    ),
+    builder: (context) {
+      return Container(
+        padding: EdgeInsets.all(24),
+        // Utilisez MediaQuery pour rendre la hauteur plus adaptative
+        height: MediaQuery.of(context).size.height * 0.45,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Barre de poignée pour indiquer que le modal peut être fermé
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                margin: EdgeInsets.only(bottom: 20),
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(10),
                 ),
               ),
-            ],
-          ),
-        );
-      },
-    );
-  }
+            ),
+            Text(
+              title,
+              style: TextStyle(
+                fontSize: 22, 
+                fontWeight: FontWeight.bold,
+                color: Colors.black87,
+              ),
+            ),
+            SizedBox(height: 16),
+            Divider(thickness: 1),
+            SizedBox(height: 16),
+            // Utilisation de ListView pour permettre le défilement si le contenu est trop long
+            Expanded(
+              child: ListView(
+                children: [
+                  _buildInfoRow(Icons.location_on, "Lieu", location),
+                  SizedBox(height: 12),
+                  _buildInfoRow(Icons.calendar_today, "Date", date),
+                  SizedBox(height: 12),
+                  _buildInfoRow(Icons.description, "Description", description),
+                ],
+              ),
+            ),
+            SizedBox(height: 16),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
+              children: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  ),
+                  child: Text("Annuler", style: TextStyle(color: Colors.grey[700])),
+                ),
+                SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: () {
+                    // Action supplémentaire si nécessaire
+                    Navigator.pop(context);
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Color(0xFF0172B2),
+                    padding: EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  child: Text("Fermer", style: TextStyle(color: Colors.white)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    },
+  );
+  }  
+
+  // Fonction auxiliaire pour créer des lignes d'information avec icônes
+Widget _buildInfoRow(IconData icon, String label, String value) {
+  return Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
+    children: [
+      Icon(icon, size: 20, color: Color(0xFF0172B2)),
+      SizedBox(width: 12),
+      Expanded(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: Colors.grey[700],
+              ),
+            ),
+            SizedBox(height: 4),
+            Text(
+              value,
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.black87,
+              ),
+            ),
+          ],
+        ),
+      ),
+    ],
+  );
+}
 }

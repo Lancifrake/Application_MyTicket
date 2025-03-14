@@ -45,9 +45,43 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       filteredEvents = allEvents.where((event) {
         final name = event['nom'].toString().toLowerCase();
-        return name.contains(query);
+        final location = event['lieu'].toString().toLowerCase();
+        final date = event['date'].toString().toLowerCase();
+        return name.contains(query) || location.contains(query) || date.contains(query);
       }).toList();
     });
+  }
+
+  void _onItemTapped(int index) {
+    if (_selectedIndex == index) return;
+
+    setState(() {
+      _selectedIndex = index;
+    });
+
+    Widget nextPage;
+
+    switch (index) {
+      case 0:
+        nextPage = HomeScreen();
+        break;
+      case 1:
+        nextPage = EventPage();
+        break;
+      case 2:
+        nextPage = TicketsPage();
+        break;
+      case 3:
+        nextPage = ProfilePage();
+        break;
+      default:
+        return;
+    }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => nextPage),
+    );
   }
 
   @override
@@ -78,9 +112,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                   SizedBox(width: 10),
                   IconButton(
-                    icon: Icon(Icons.shopping_cart, color: Colors.blue, size: 28),
+                    icon: Icon(Icons.shopping_cart, color: Color(0xFF0172B2), size: 28),
                     onPressed: () {
-                      Navigator.pushNamed(context, '/cart');
+                      Navigator.pushReplacementNamed(context, '/cart');
                     },
                   ),
                 ],
@@ -119,7 +153,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   final event = filteredEvents[index];
                   return _buildEventCard(
                     event['nom'],
-                    event['imagePath'] ?? 'https://via.placeholder.com/150',
+                    event['imagePath'] ?? 'assets/images/eminem.jpg',
                     event['lieu'],
                     event['date'].split('T')[0],
                   );
@@ -131,7 +165,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
-        selectedItemColor: Colors.blue,
+        selectedItemColor: Color(0xFF0172B2),
         unselectedItemColor: Colors.grey,
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
@@ -222,16 +256,10 @@ class _HomeScreenState extends State<HomeScreen> {
           style: TextStyle(
             fontSize: 16,
             fontWeight: _selectedCategory == index ? FontWeight.bold : FontWeight.normal,
-            color: _selectedCategory == index ? Colors.blue : Colors.grey,
+            color: _selectedCategory == index ? Color(0xFF0172B2) : Colors.grey,
           ),
         ),
       ),
     );
-  }
-
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
   }
 }
